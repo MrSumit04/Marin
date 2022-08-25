@@ -7,6 +7,9 @@ GNU General Public License v3.0
 
 Copyright (C) 2022, SOME-1HING [https://github.com/SOME-1HING]
 
+Credits:-
+    I don't know who originally wrote this code. If you originally wrote this code, please reach out to me. 
+
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
@@ -21,201 +24,542 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-import time
-import re
-from Shikimori.__main__ import HELPABLE, IMPORTED, USER_SETTINGS, CHAT_SETTINGS
-from Shikimori.modules.helper_funcs.readable_time import get_readable_time
-from Shikimori import (
-    dispatcher,
-    StartTime,
-)
-from Shikimori.vars import (
-    BOT_USERNAME,
-    OWNER_USERNAME,
-    UPDATE_CHANNEL,
-    SUPPORT_CHAT,
-    ANIME_NAME,
-    START_MEDIA,)
-from Shikimori.modules.helper_funcs.misc import paginate_modules
-from Shikimori.modules.helper_funcs.chat_status import is_user_admin
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ParseMode, Update
-from telegram.ext import CallbackContext, CommandHandler
-from telegram.utils.helpers import escape_markdown
+import html
+from typing import Optional
 
-bot_name = f"{dispatcher.bot.first_name}"
+import Shikimori.modules.sql.blsticker_sql as sql
+from Shikimori import LOGGER, dispatcher
+from Shikimori.modules.connection import connected
+from Shikimori.modules.disable import DisableAbleCommandHandler
+from Shikimori.modules.helper_funcs.alternate import send_message
+from Shikimori.modules.helper_funcs.chat_status import user_admin, user_not_admin
+from Shikimori.modules.helper_funcs.misc import split_message
+from Shikimori.modules.helper_funcs.string_handling import extract_time
 
-IMG_START = START_MEDIA.split(".")
-start_id = IMG_START[-1]
+from Shikimori.modules.log_channel import loggable
+from Shikimori.modules.warns import warn
+from telegram import Chat, Message, ParseMode, Update, User, ChatPermissions
+from telegram.error import BadRequest
+from telegram.ext import CallbackContext, CommandHandler, Filters, MessageHandler
+from telegram.utils.helpers import mention_html, mention_markdown
 
-PM_START_TEXT = """
-\n◍ I'ᴍ Kᴀᴏʀɪ Mɪʏᴀᴢᴏɴᴏ A Gʀᴏᴜᴘ 
-Mᴀɴᴀɢᴇᴍᴇɴᴛ Bᴏᴛ Bᴀsᴇᴅ Oɴ Tʜᴇ Aɴɪᴍᴇ Yᴏᴜʀ Lɪᴇ Iɴ Aᴘʀɪʟ.
-────────────────────────
-× Uᴘᴛɪᴍᴇ: {}
-────────────────────────
-✪ Hɪᴛ /help Tᴏ Sᴇᴇ Mʏ Aᴠᴀɪʟᴀʙʟᴇ Cᴏᴍᴍᴀɴᴅs.
-"""
 
-HELP_STRINGS = """
-Click on the button bellow to get description about specifics command."""
-
-buttons = [
-    [
-        InlineKeyboardButton(
-            text=f"➕ Aᴅᴅ Mᴇ Tᴏ Yᴏᴜʀ Cʜᴀᴛ ➕", url=f"t.me/{BOT_USERNAME}?startgroup=true"),
-    ],
-    [
-        InlineKeyboardButton(text="Sᴜᴘᴘᴏʀᴛ", url=f"https://t.me/{SUPPORT_CHAT}"),
-        InlineKeyboardButton(text="Uᴘᴅᴀᴛᴇ", url=f"https://t.me/{UPDATE_CHANNEL}"),
-    ], 
-    [
-        InlineKeyboardButton(text=f"Dᴇᴠᴇʟᴏᴘᴇʀ", url=f"t.me/Iamjeansama/3"),
-    ],
-]
-
-def start(update: Update, context: CallbackContext):
-    args = context.args
-    uptime = get_readable_time((time.time() - StartTime))
-    if update.effective_chat.type == "private":
-        if len(args) >= 1:
-            if args[0].lower() == "help":
-                send_help(update.effective_chat.id, HELP_STRINGS)
-            elif args[0].lower().startswith("ghelp_"):
-                mod = args[0].lower().split("_", 1)[1]
-                if not HELPABLE.get(mod, False):
-                    return
-                send_help(
-                    update.effective_chat.id,
-                    HELPABLE[mod].__help__,
-                    InlineKeyboardMarkup(
-                        [[InlineKeyboardButton(text="Go Back", callback_data="help_back")]]
-                    ),
-                )
-
-            elif args[0].lower().startswith("stngs_"):
-                match = re.match("stngs_(.*)", args[0].lower())
-                chat = dispatcher.bot.getChat(match.group(1))
-
-                if is_user_admin(chat, update.effective_user.id):
-                    send_settings(match.group(1), update.effective_user.id, False)
-                else:
-                    send_settings(match.group(1), update.effective_user.id, True)
-
-            elif args[0][1:].isdigit() and "rules" in IMPORTED:
-                IMPORTED["rules"].send_rules(update, args[0], from_pm=True)
-
-        else:
-            first_name = update.effective_user.first_name
-            uptime = get_readable_time((time.time() - StartTime))
-            hmm = "◍ Bᴀᴋᴀ *{}*!".format(escape_markdown(first_name))
-            start_text = hmm + PM_START_TEXT.format(uptime)
-            try:
-                if start_id in ("jpeg", "jpg", "png"):
-                    update.effective_message.reply_photo(
-                        START_MEDIA, caption = start_text, reply_markup=InlineKeyboardMarkup(buttons),
-                    parse_mode=ParseMode.MARKDOWN,
-                )
-                elif start_id in ("mp4", "mkv"):
-                    update.effective_message.reply_video(
-                    START_MEDIA, caption = start_text, reply_markup=InlineKeyboardMarkup(buttons),
-                    parse_mode=ParseMode.MARKDOWN,
-                )
-                elif start_id in ("gif", "webp"):
-                    update.effective_message.reply_animation(
-                    START_MEDIA, caption = start_text, reply_markup=InlineKeyboardMarkup(buttons),
-                    parse_mode=ParseMode.MARKDOWN,
-                )
-                else:
-                    update.effective_message.reply_text(start_text, reply_markup=InlineKeyboardMarkup(buttons),
-                    parse_mode=ParseMode.MARKDOWN,)
-            except:
-                update.effective_message.reply_text(start_text, reply_markup=InlineKeyboardMarkup(buttons),
-                    parse_mode=ParseMode.MARKDOWN,)
+def blackliststicker(update: Update, context: CallbackContext):
+    msg = update.effective_message  # type: Optional[Message]
+    chat = update.effective_chat  # type: Optional[Chat]
+    user = update.effective_user  # type: Optional[User]
+    bot, args = context.bot, context.args
+    conn = connected(bot, update, chat, user.id, need_admin=False)
+    if conn:
+        chat_id = conn
+        chat_name = dispatcher.bot.getChat(conn).title
     else:
-        start_buttons = [
-                 [
-                    InlineKeyboardButton(text="Sᴜᴘᴘᴏʀᴛ", url=f"https://t.me/{SUPPORT_CHAT}"),
-                    InlineKeyboardButton(text="Uᴘᴅᴀᴛᴇ", url=f"https://t.me/{UPDATE_CHANNEL}")
-                 ]
-                ]
+        if chat.type == "private":
+            return
         chat_id = update.effective_chat.id
-        first_name = update.effective_user.first_name
-        chat_name = dispatcher.bot.getChat(chat_id).title
-        start_text= "*Hᴇʏ {}, I'ᴍ Kᴀᴏʀɪ Mɪʏᴀᴢᴏɴᴏ I'ᴍ Hᴇʀᴇ Fᴏʀ Yᴏᴜ Aᴛ {} Sɪɴᴄᴇ :* `{}`\n".format(escape_markdown(first_name), escape_markdown(chat_name), uptime)
-        try:
-            if start_id in ("jpeg", "jpg", "png"):
-                update.effective_message.reply_photo(
-                    START_MEDIA, caption = start_text, reply_markup=InlineKeyboardMarkup(start_buttons),
-                parse_mode=ParseMode.MARKDOWN,
-            )
-            elif start_id in ("mp4", "mkv"):
-                update.effective_message.reply_video(
-                START_MEDIA, caption = start_text, reply_markup=InlineKeyboardMarkup(start_buttons),
-                parse_mode=ParseMode.MARKDOWN,
-            )
-            elif start_id in ("gif", "webp"):
-                update.effective_message.reply_animation(
-                START_MEDIA, caption = start_text, reply_markup=InlineKeyboardMarkup(start_buttons),
-                parse_mode=ParseMode.MARKDOWN,
-            )
-            else:
-                update.effective_message.reply_text(start_text, reply_markup=InlineKeyboardMarkup(start_buttons),
-                parse_mode=ParseMode.MARKDOWN,)
+        chat_name = chat.title
 
-        except:
-            update.effective_message.reply_text(start_text, reply_markup=InlineKeyboardMarkup(start_buttons),
-                parse_mode=ParseMode.MARKDOWN,)
-
-start_handler = CommandHandler("start", start, run_async=True)
-dispatcher.add_handler(start_handler)
-
-def send_settings(chat_id, user_id, user=False):
-    if user:
-        if USER_SETTINGS:
-            settings = "\n\n".join(
-                "*{}*:\n{}".format(mod.__mod_name__, mod.__user_settings__(user_id))
-                for mod in USER_SETTINGS.values()
-            )
-            dispatcher.bot.send_message(
-                user_id,
-                "These are your current settings:" + "\n\n" + settings,
-                parse_mode=ParseMode.MARKDOWN,
-            )
-
-        else:
-            dispatcher.bot.send_message(
-                user_id,
-                "Seems like there aren't any user specific settings available :'(",
-                parse_mode=ParseMode.MARKDOWN,
-            )
-
-    else:
-        if CHAT_SETTINGS:
-            chat_name = dispatcher.bot.getChat(chat_id).title
-            dispatcher.bot.send_message(
-                user_id,
-                text="Which module would you like to check {}'s settings for?".format(
-                    chat_name
-                ),
-                reply_markup=InlineKeyboardMarkup(
-                    paginate_modules(0, CHAT_SETTINGS, "stngs", chat=chat_id)
-                ),
-            )
-        else:
-            dispatcher.bot.send_message(
-                user_id,
-                "Seems like there aren't any chat settings available :'(\nSend this "
-                "in a group chat you're admin in to find its current settings!",
-                parse_mode=ParseMode.MARKDOWN,
-            )
-
-def send_help(chat_id, text, keyboard=None):
-    if not keyboard:
-        keyboard = InlineKeyboardMarkup(paginate_modules(0, HELPABLE, "help"))
-    dispatcher.bot.send_message(
-        chat_id=chat_id,
-        text=text,
-        parse_mode=ParseMode.MARKDOWN,
-        disable_web_page_preview=True,
-        reply_markup=keyboard,
+    sticker_list = "<b>List blacklisted stickers currently in {}:</b>\n".format(
+        chat_name,
     )
+
+    all_stickerlist = sql.get_chat_stickers(chat_id)
+
+    if len(args) > 0 and args[0].lower() == "copy":
+        for trigger in all_stickerlist:
+            sticker_list += "<code>{}</code>\n".format(html.escape(trigger))
+    elif len(args) == 0:
+        for trigger in all_stickerlist:
+            sticker_list += " - <code>{}</code>\n".format(html.escape(trigger))
+
+    split_text = split_message(sticker_list)
+    for text in split_text:
+        if (
+            sticker_list
+            == "<b>List blacklisted stickers currently in {}:</b>\n".format(
+                chat_name,
+            ).format(html.escape(chat_name))
+        ):
+            send_message(
+                update.effective_message,
+                "There are no blacklist stickers in <b>{}</b>!".format(
+                    html.escape(chat_name),
+                ),
+                parse_mode=ParseMode.HTML,
+            )
+            return
+    send_message(update.effective_message, text, parse_mode=ParseMode.HTML)
+
+
+@user_admin
+def add_blackliststicker(update: Update, context: CallbackContext):
+    bot = context.bot
+    msg = update.effective_message  # type: Optional[Message]
+    chat = update.effective_chat  # type: Optional[Chat]
+    user = update.effective_user  # type: Optional[User]
+    words = msg.text.split(None, 1)
+    bot = context.bot
+    conn = connected(bot, update, chat, user.id)
+    if conn:
+        chat_id = conn
+        chat_name = dispatcher.bot.getChat(conn).title
+    else:
+        chat_id = update.effective_chat.id
+        if chat.type == "private":
+            return
+        chat_name = chat.title
+
+    if len(words) > 1:
+        text = words[1].replace("https://t.me/addstickers/", "")
+        to_blacklist = list(
+            {trigger.strip() for trigger in text.split("\n") if trigger.strip()},
+        )
+
+        added = 0
+        for trigger in to_blacklist:
+            try:
+                get = bot.getStickerSet(trigger)
+                sql.add_to_stickers(chat_id, trigger.lower())
+                added += 1
+            except BadRequest:
+                send_message(
+                    update.effective_message,
+                    "Sticker `{}` can not be found!".format(trigger),
+                    parse_mode="markdown",
+                )
+
+        if added == 0:
+            return
+
+        if len(to_blacklist) == 1:
+            send_message(
+                update.effective_message,
+                "Sticker <code>{}</code> added to blacklist stickers in <b>{}</b>!".format(
+                    html.escape(to_blacklist[0]),
+                    html.escape(chat_name),
+                ),
+                parse_mode=ParseMode.HTML,
+            )
+        else:
+            send_message(
+                update.effective_message,
+                "<code>{}</code> stickers added to blacklist sticker in <b>{}</b>!".format(
+                    added,
+                    html.escape(chat_name),
+                ),
+                parse_mode=ParseMode.HTML,
+            )
+    elif msg.reply_to_message:
+        added = 0
+        trigger = msg.reply_to_message.sticker.set_name
+        if trigger is None:
+            send_message(update.effective_message, "Sticker is invalid!")
+            return
+        try:
+            get = bot.getStickerSet(trigger)
+            sql.add_to_stickers(chat_id, trigger.lower())
+            added += 1
+        except BadRequest:
+            send_message(
+                update.effective_message,
+                "Sticker `{}` can not be found!".format(trigger),
+                parse_mode="markdown",
+            )
+
+        if added == 0:
+            return
+
+        send_message(
+            update.effective_message,
+            "Sticker <code>{}</code> added to blacklist stickers in <b>{}</b>!".format(
+                trigger,
+                html.escape(chat_name),
+            ),
+            parse_mode=ParseMode.HTML,
+        )
+    else:
+        send_message(
+            update.effective_message,
+            "Tell me what stickers you want to add to the blacklist.",
+        )
+
+
+@user_admin
+def unblackliststicker(update: Update, context: CallbackContext):
+    bot = context.bot
+    msg = update.effective_message  # type: Optional[Message]
+    chat = update.effective_chat  # type: Optional[Chat]
+    user = update.effective_user  # type: Optional[User]
+    words = msg.text.split(None, 1)
+    bot = context.bot
+    conn = connected(bot, update, chat, user.id)
+    if conn:
+        chat_id = conn
+        chat_name = dispatcher.bot.getChat(conn).title
+    else:
+        chat_id = update.effective_chat.id
+        if chat.type == "private":
+            return
+        chat_name = chat.title
+
+    if len(words) > 1:
+        text = words[1].replace("https://t.me/addstickers/", "")
+        to_unblacklist = list(
+            {trigger.strip() for trigger in text.split("\n") if trigger.strip()},
+        )
+
+        successful = 0
+        for trigger in to_unblacklist:
+            success = sql.rm_from_stickers(chat_id, trigger.lower())
+            if success:
+                successful += 1
+
+        if len(to_unblacklist) == 1:
+            if successful:
+                send_message(
+                    update.effective_message,
+                    "Sticker <code>{}</code> deleted from blacklist in <b>{}</b>!".format(
+                        html.escape(to_unblacklist[0]),
+                        html.escape(chat_name),
+                    ),
+                    parse_mode=ParseMode.HTML,
+                )
+            else:
+                send_message(
+                    update.effective_message,
+                    "This sticker is not on the blacklist...!",
+                )
+
+        elif successful == len(to_unblacklist):
+            send_message(
+                update.effective_message,
+                "Sticker <code>{}</code> deleted from blacklist in <b>{}</b>!".format(
+                    successful,
+                    html.escape(chat_name),
+                ),
+                parse_mode=ParseMode.HTML,
+            )
+
+        elif not successful:
+            send_message(
+                update.effective_message,
+                "None of these stickers exist, so they cannot be removed.",
+                parse_mode=ParseMode.HTML,
+            )
+
+        else:
+            send_message(
+                update.effective_message,
+                "Sticker <code>{}</code> deleted from blacklist. {} did not exist, so it's not deleted.".format(
+                    successful,
+                    len(to_unblacklist) - successful,
+                ),
+                parse_mode=ParseMode.HTML,
+            )
+    elif msg.reply_to_message:
+        trigger = msg.reply_to_message.sticker.set_name
+        if trigger is None:
+            send_message(update.effective_message, "Sticker is invalid!")
+            return
+        success = sql.rm_from_stickers(chat_id, trigger.lower())
+
+        if success:
+            send_message(
+                update.effective_message,
+                "Sticker <code>{}</code> deleted from blacklist in <b>{}</b>!".format(
+                    trigger,
+                    chat_name,
+                ),
+                parse_mode=ParseMode.HTML,
+            )
+        else:
+            send_message(
+                update.effective_message,
+                "{} not found on blacklisted stickers...!".format(trigger),
+            )
+    else:
+        send_message(
+            update.effective_message,
+            "Tell me what stickers you want to add to the blacklist.",
+        )
+
+
+@loggable
+@user_admin
+def blacklist_mode(update: Update, context: CallbackContext):
+    chat = update.effective_chat  # type: Optional[Chat]
+    user = update.effective_user  # type: Optional[User]
+    msg = update.effective_message  # type: Optional[Message]
+    bot, args = context.bot, context.args
+    conn = connected(bot, update, chat, user.id, need_admin=True)
+    if conn:
+        chat = dispatcher.bot.getChat(conn)
+        chat_id = conn
+        chat_name = dispatcher.bot.getChat(conn).title
+    else:
+        if update.effective_message.chat.type == "private":
+            send_message(
+                update.effective_message,
+                "You can do this command in groups, not PM",
+            )
+            return ""
+        chat = update.effective_chat
+        chat_id = update.effective_chat.id
+        chat_name = update.effective_message.chat.title
+
+    if args:
+        if args[0].lower() in ["off", "nothing", "no"]:
+            settypeblacklist = "turn off"
+            sql.set_blacklist_strength(chat_id, 0, "0")
+        elif args[0].lower() in ["del", "delete"]:
+            settypeblacklist = "left, the message will be deleted"
+            sql.set_blacklist_strength(chat_id, 1, "0")
+        elif args[0].lower() == "warn":
+            settypeblacklist = "warned"
+            sql.set_blacklist_strength(chat_id, 2, "0")
+        elif args[0].lower() == "mute":
+            settypeblacklist = "muted"
+            sql.set_blacklist_strength(chat_id, 3, "0")
+        elif args[0].lower() == "kick":
+            settypeblacklist = "kicked"
+            sql.set_blacklist_strength(chat_id, 4, "0")
+        elif args[0].lower() == "ban":
+            settypeblacklist = "banned"
+            sql.set_blacklist_strength(chat_id, 5, "0")
+        elif args[0].lower() == "tban":
+            if len(args) == 1:
+                teks = """It looks like you are trying to set a temporary value to blacklist, but has not determined the time; use `/blstickermode tban <timevalue>`.
+                                              Examples of time values: 4m = 4 minute, 3h = 3 hours, 6d = 6 days, 5w = 5 weeks."""
+                send_message(update.effective_message, teks, parse_mode="markdown")
+                return
+            settypeblacklist = "temporary banned for {}".format(args[1])
+            sql.set_blacklist_strength(chat_id, 6, str(args[1]))
+        elif args[0].lower() == "tmute":
+            if len(args) == 1:
+                teks = """It looks like you are trying to set a temporary value to blacklist, but has not determined the time; use `/blstickermode tmute <timevalue>`.
+                                              Examples of time values: 4m = 4 minute, 3h = 3 hours, 6d = 6 days, 5w = 5 weeks."""
+                send_message(update.effective_message, teks, parse_mode="markdown")
+                return
+            settypeblacklist = "temporary muted for {}".format(args[1])
+            sql.set_blacklist_strength(chat_id, 7, str(args[1]))
+        else:
+            send_message(
+                update.effective_message,
+                "I only understand off/del/warn/ban/kick/mute/tban/tmute!",
+            )
+            return
+        if conn:
+            text = "Blacklist sticker mode changed, users will be `{}` at *{}*!".format(
+                settypeblacklist,
+                chat_name,
+            )
+        else:
+            text = "Blacklist sticker mode changed, users will be `{}`!".format(
+                settypeblacklist,
+            )
+        send_message(update.effective_message, text, parse_mode="markdown")
+        return (
+            "<b>{}:</b>\n"
+            "<b>Admin:</b> {}\n"
+            "Changed sticker blacklist mode. users will be {}.".format(
+                html.escape(chat.title),
+                mention_html(user.id, html.escape(user.first_name)),
+                settypeblacklist,
+            )
+        )
+    getmode, getvalue = sql.get_blacklist_setting(chat.id)
+    if getmode == 0:
+        settypeblacklist = "not active"
+    elif getmode == 1:
+        settypeblacklist = "delete"
+    elif getmode == 2:
+        settypeblacklist = "warn"
+    elif getmode == 3:
+        settypeblacklist = "mute"
+    elif getmode == 4:
+        settypeblacklist = "kick"
+    elif getmode == 5:
+        settypeblacklist = "ban"
+    elif getmode == 6:
+        settypeblacklist = "temporarily banned for {}".format(getvalue)
+    elif getmode == 7:
+        settypeblacklist = "temporarily muted for {}".format(getvalue)
+    if conn:
+        text = "Blacklist sticker mode is currently set to *{}* in *{}*.".format(
+            settypeblacklist,
+            chat_name,
+        )
+    else:
+        text = "Blacklist sticker mode is currently set to *{}*.".format(
+            settypeblacklist,
+        )
+    send_message(update.effective_message, text, parse_mode=ParseMode.MARKDOWN)
+    return ""
+
+
+@user_not_admin
+def del_blackliststicker(update: Update, context: CallbackContext):
+    bot = context.bot
+    chat = update.effective_chat  # type: Optional[Chat]
+    message = update.effective_message  # type: Optional[Message]
+    user = update.effective_user
+    to_match = message.sticker
+    if not to_match or not to_match.set_name:
+        return
+    bot = context.bot
+    getmode, value = sql.get_blacklist_setting(chat.id)
+
+    chat_filters = sql.get_chat_stickers(chat.id)
+    for trigger in chat_filters:
+        if to_match.set_name.lower() == trigger.lower():
+            try:
+                if getmode == 0:
+                    return
+                if getmode == 1:
+                    message.delete()
+                elif getmode == 2:
+                    message.delete()
+                    warn(
+                        update.effective_user,
+                        chat,
+                        "Using sticker '{}' which in blacklist stickers".format(
+                            trigger,
+                        ),
+                        message,
+                        update.effective_user,
+                        # conn=False,
+                    )
+                    return
+                elif getmode == 3:
+                    message.delete()
+                    bot.restrict_chat_member(
+                        chat.id,
+                        update.effective_user.id,
+                        permissions=ChatPermissions(can_send_messages=False),
+                    )
+                    bot.sendMessage(
+                        chat.id,
+                        "{} muted because using '{}' which in blacklist stickers".format(
+                            mention_markdown(user.id, user.first_name),
+                            trigger,
+                        ),
+                        parse_mode="markdown",
+                    )
+                    return
+                elif getmode == 4:
+                    message.delete()
+                    res = chat.unban_member(update.effective_user.id)
+                    if res:
+                        bot.sendMessage(
+                            chat.id,
+                            "{} kicked because using '{}' which in blacklist stickers".format(
+                                mention_markdown(user.id, user.first_name),
+                                trigger,
+                            ),
+                            parse_mode="markdown",
+                        )
+                    return
+                elif getmode == 5:
+                    message.delete()
+                    chat.ban_member(user.id)
+                    bot.sendMessage(
+                        chat.id,
+                        "{} banned because using '{}' which in blacklist stickers".format(
+                            mention_markdown(user.id, user.first_name),
+                            trigger,
+                        ),
+                        parse_mode="markdown",
+                    )
+                    return
+                elif getmode == 6:
+                    message.delete()
+                    bantime = extract_time(message, value)
+                    chat.ban_member(user.id, until_date=bantime)
+                    bot.sendMessage(
+                        chat.id,
+                        "{} banned for {} because using '{}' which in blacklist stickers".format(
+                            mention_markdown(user.id, user.first_name),
+                            value,
+                            trigger,
+                        ),
+                        parse_mode="markdown",
+                    )
+                    return
+                elif getmode == 7:
+                    message.delete()
+                    mutetime = extract_time(message, value)
+                    bot.restrict_chat_member(
+                        chat.id,
+                        user.id,
+                        permissions=ChatPermissions(can_send_messages=False),
+                        until_date=mutetime,
+                    )
+                    bot.sendMessage(
+                        chat.id,
+                        "{} muted for {} because using '{}' which in blacklist stickers".format(
+                            mention_markdown(user.id, user.first_name),
+                            value,
+                            trigger,
+                        ),
+                        parse_mode="markdown",
+                    )
+                    return
+            except BadRequest as excp:
+                if excp.message != "Message to delete not found":
+                    LOGGER.exception("Error while deleting blacklist message.")
+                break
+
+
+def __import_data__(chat_id, data):
+    # set chat blacklist
+    blacklist = data.get("sticker_blacklist", {})
+    for trigger in blacklist:
+        sql.add_to_stickers(chat_id, trigger)
+
+
+def __migrate__(old_chat_id, new_chat_id):
+    sql.migrate_chat(old_chat_id, new_chat_id)
+
+
+def __chat_settings__(chat_id, user_id):
+    blacklisted = sql.num_stickers_chat_filters(chat_id)
+    return "There are `{} `blacklisted stickers.".format(blacklisted)
+
+
+def __stats__():
+    return "× {} blacklist stickers, across {} chats.".format(
+        sql.num_stickers_filters(),
+        sql.num_stickers_filter_chats(),
+    )
+
+
+__mod_name__ = "Stickers Blacklist"
+
+BLACKLIST_STICKER_HANDLER = DisableAbleCommandHandler(
+    "blsticker",
+    blackliststicker,
+    admin_ok=True,
+    run_async=True,
+)
+ADDBLACKLIST_STICKER_HANDLER = DisableAbleCommandHandler(
+    "addblsticker",
+    add_blackliststicker,
+    run_async=True,
+)
+UNBLACKLIST_STICKER_HANDLER = CommandHandler(
+    ["unblsticker", "rmblsticker"],
+    unblackliststicker,
+    run_async=True,
+)
+BLACKLISTMODE_HANDLER = CommandHandler("blstickermode", blacklist_mode)
+BLACKLIST_STICKER_DEL_HANDLER = MessageHandler(
+    Filters.sticker & Filters.chat_type.groups,
+    del_blackliststicker,
+    run_async=True,
+)
+
+dispatcher.add_handler(BLACKLIST_STICKER_HANDLER)
+dispatcher.add_handler(ADDBLACKLIST_STICKER_HANDLER)
+dispatcher.add_handler(UNBLACKLIST_STICKER_HANDLER)
+dispatcher.add_handler(BLACKLISTMODE_HANDLER)
+dispatcher.add_handler(BLACKLIST_STICKER_DEL_HANDLER)
