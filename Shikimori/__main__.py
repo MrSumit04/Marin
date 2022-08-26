@@ -195,14 +195,14 @@ def main():
         try:
             dispatcher.bot.sendMessage(
                 f"@{SUPPORT_CHAT}",              
-                f"""**I Am Ready To Concert Darling [🙂](https://telegra.ph/file/689ae81c495da6c295fe2.jpg)!**""",
+                f"""**Hey babe I Am Ready for Date [☺️](https://telegra.ph/file/5608ccb6b75809c35f1a7.jpg)!**""",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=InlineKeyboardMarkup(
                 [
                   [                  
                        InlineKeyboardButton(
-                             text="✦ PLAY VIOLEN ✦",
-                             url="https://t.me/KaoriXRobot?startgroup=true")
+                             text="✦ let's go Baby ✦",
+                             url="https://t.meMarinKawaiiBot/?startgroup=true")
                      ] 
                 ]
             ),
