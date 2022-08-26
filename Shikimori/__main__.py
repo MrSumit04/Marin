@@ -202,7 +202,7 @@ def main():
                   [                  
                        InlineKeyboardButton(
                              text="✦ let's go Baby ✦",
-                             url="https://t.meMarinKawaiiBot/?startgroup=true")
+                             url="https://t.me/MarinKawaiiBot/?startgroup=true")
                      ] 
                 ]
             ),
