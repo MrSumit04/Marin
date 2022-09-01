@@ -31,7 +31,8 @@ from Shikimori import (
 )
 from Shikimori.vars import (
     BOT_USERNAME,
-    OWNER_USERNAME,
+    HELP_STRINGS,
+    PM_START_TEXT,
     UPDATE_CHANNEL,
     SUPPORT_CHAT,
     ANIME_NAME,
@@ -41,23 +42,12 @@ from Shikimori.modules.helper_funcs.chat_status import is_user_admin
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ParseMode, Update
 from telegram.ext import CallbackContext, CommandHandler
 from telegram.utils.helpers import escape_markdown
+import Shikimori.modules.sql.users_sql as sql
 
 bot_name = f"{dispatcher.bot.first_name}"
 
 IMG_START = START_MEDIA.split(".")
 start_id = IMG_START[-1]
-
-PM_START_TEXT = """
-\n◍ I'ᴍ Marin Kitagawa A Gʀᴏᴜᴘ 
-Mᴀɴᴀɢᴇᴍᴇɴᴛ Bᴏᴛ Bᴀsᴇᴅ Oɴ Tʜᴇ Aɴɪᴍᴇ My Dress Up Darling.
-────────────────────────
-× Uᴘᴛɪᴍᴇ: {}
-────────────────────────
-✪ Hɪᴛ /help Tᴏ Sᴇᴇ Mʏ Aᴠᴀɪʟᴀʙʟᴇ Cᴏᴍᴍᴀɴᴅs.
-"""
-
-HELP_STRINGS = """
-Click on the button bellow to get description about specifics command."""
 
 buttons = [
     [
@@ -66,9 +56,8 @@ buttons = [
     ],
     [
         InlineKeyboardButton(text="Sᴜᴘᴘᴏʀᴛ", url=f"https://t.me/{SUPPORT_CHAT}"),
-        InlineKeyboardButton(text="Uᴘᴅᴀᴛᴇ", url=f"https://t.me/{UPDATE_CHANNEL}"),
+        InlineKeyboardButton(text="Uᴘᴅᴀᴛᴇ", url=f"https://t.me/{UPDATE_CHANNEL}"),   
     ], 
- 
 ]
 
 def start(update: Update, context: CallbackContext):
@@ -103,10 +92,10 @@ def start(update: Update, context: CallbackContext):
                 IMPORTED["rules"].send_rules(update, args[0], from_pm=True)
 
         else:
+            users = f"{sql.num_users()}"
+            chats = f"{sql.num_chats()}"
             first_name = update.effective_user.first_name
-            uptime = get_readable_time((time.time() - StartTime))
-            hmm = "◍ Bᴀᴋᴀ *{}*!".format(escape_markdown(first_name))
-            start_text = hmm + PM_START_TEXT.format(uptime)
+            start_text = PM_START_TEXT.format(escape_markdown(first_name), bot_name, ANIME_NAME, users, chats, uptime)
             try:
                 if start_id in ("jpeg", "jpg", "png"):
                     update.effective_message.reply_photo(
@@ -126,20 +115,21 @@ def start(update: Update, context: CallbackContext):
                 else:
                     update.effective_message.reply_text(start_text, reply_markup=InlineKeyboardMarkup(buttons),
                     parse_mode=ParseMode.MARKDOWN,)
+
             except:
                 update.effective_message.reply_text(start_text, reply_markup=InlineKeyboardMarkup(buttons),
                     parse_mode=ParseMode.MARKDOWN,)
     else:
         start_buttons = [
                  [
-                    InlineKeyboardButton(text="Sᴜᴘᴘᴏʀᴛ", url=f"https://t.me/{SUPPORT_CHAT}"),
-                    InlineKeyboardButton(text="Uᴘᴅᴀᴛᴇ", url=f"https://t.me/{UPDATE_CHANNEL}")
+                    InlineKeyboardButton(text="🚨Support Grp", url=f"https://t.me/{SUPPORT_CHAT}"),
+                    InlineKeyboardButton(text="❗Updates", url=f"https://t.me/{UPDATE_CHANNEL}")
                  ]
                 ]
         chat_id = update.effective_chat.id
         first_name = update.effective_user.first_name
         chat_name = dispatcher.bot.getChat(chat_id).title
-        start_text= "*Hᴇʏ {}, I'ᴍ Kᴀᴏʀɪ Mɪʏᴀᴢᴏɴᴏ I'ᴍ Hᴇʀᴇ Fᴏʀ Yᴏᴜ Aᴛ {} Sɪɴᴄᴇ :* `{}`\n".format(escape_markdown(first_name), escape_markdown(chat_name), uptime)
+        start_text= "*Hey {}, I'm here for you at {} since :* `{}`\n".format(escape_markdown(first_name), escape_markdown(chat_name), uptime)
         try:
             if start_id in ("jpeg", "jpg", "png"):
                 update.effective_message.reply_photo(
