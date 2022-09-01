@@ -105,6 +105,8 @@ def start(update: Update, context: CallbackContext):
                 IMPORTED["rules"].send_rules(update, args[0], from_pm=True)
 
         else:
+            users = f"{sql.num_users()}"
+            chats = f"{sql.num_chats()}"
             first_name = update.effective_user.first_name
             uptime = get_readable_time((time.time() - StartTime))
             hmm = "◍ Bᴀᴋᴀ *{}*!".format(escape_markdown(first_name))
